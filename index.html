@@ -645,6 +645,10 @@
             const [isProcessing, setIsProcessing] = useState(false);    
             const [progressText, setProgressText] = useState('');    
                 
+            // 修正: 生成済み画像を保持するStateを追加    
+            const [generatedImages, setGeneratedImages] = useState([]);    
+            const [isGenerationComplete, setIsGenerationComplete] = useState(false);    
+    
             const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);    
             const [imageScale, setImageScale] = useState(1);    
             const [imagePos, setImagePos] = useState({ x: 0, y: 0 });    
@@ -789,6 +793,8 @@
     
                 setIsProcessing(true);    
                 setProgressText("準備中...");    
+                setGeneratedImages([]); // リセット    
+                setIsGenerationComplete(false);    
     
                 // 隠しコンテナを作成（画面外）    
                 const hiddenContainer = document.createElement('div');    
@@ -801,6 +807,7 @@
                 document.body.appendChild(hiddenContainer);    
     
                 const root = ReactDOM.createRoot(hiddenContainer);    
+                const newImages = [];    
     
                 try {    
                     await document.fonts.ready;    
@@ -838,7 +845,7 @@
                             setTimeout(resolve, 2000);     
                         });    
     
-                        // キャプチャ    
+                        // キャプチャしてDataURLを取得    
                         const canvas = await html2canvas(hiddenContainer.firstChild, {    
                             scale: 3,     
                             useCORS: true,     
@@ -847,19 +854,19 @@
                             height: CARD_HEIGHT,     
                         });    
     
-                        // ダウンロード    
-                        const link = document.createElement('a');    
-                        link.download = `nengajo_${name}_${Date.now()}.png`;    
-                        link.href = canvas.toDataURL("image/png");    
-                        document.body.appendChild(link);    
-                        link.click();    
-                        document.body.removeChild(link);    
+                        const dataUrl = canvas.toDataURL("image/png");    
+                        newImages.push({    
+                            name: `nengajo_${name}_${Date.now()}.png`,    
+                            data: dataUrl    
+                        });    
     
-                        // ブラウザの負荷軽減とダウンロードブロック回避のため待機    
-                        await new Promise(r => setTimeout(r, 1500));    
+                        // ブラウザの負荷軽減のため少し待機    
+                        await new Promise(r => setTimeout(r, 200));    
                     }    
                         
-                    alert("画像フォルダへの保存が完了しました！\n（保存されていない場合は、ブラウザのダウンロード許可設定を確認してください）");    
+                    setGeneratedImages(newImages);    
+                    setIsGenerationComplete(true);    
+                    alert("画像の生成が完了しました！\n「一括ダウンロードする」ボタンを押して保存してください。");    
     
                 } catch (error) {    
                     console.error("Generation failed:", error);    
@@ -871,6 +878,26 @@
                     }    
                     setIsProcessing(false);    
                     setProgressText("");    
+                }    
+            };    
+    
+            // 一括ダウンロード処理    
+            const handleBatchDownload = async () => {    
+                if (generatedImages.length === 0) return;    
+    
+                alert("ダウンロードを開始します。\nブラウザから「複数のファイルのダウンロード」の許可を求められた場合は「許可」を選択してください。");    
+    
+                for (let i = 0; i < generatedImages.length; i++) {    
+                    const img = generatedImages[i];    
+                    const link = document.createElement('a');    
+                    link.download = img.name;    
+                    link.href = img.data;    
+                    document.body.appendChild(link);    
+                    link.click();    
+                    document.body.removeChild(link);    
+    
+                    // スマホでの連続ダウンロード詰まり防止のためのウェイト    
+                    await new Promise(r => setTimeout(r, 1000));    
                 }    
             };    
     
@@ -1112,21 +1139,27 @@
     
                         {/* Footer (Always Visible now) */}    
                         <div className="max-w-6xl mx-auto px-4 pb-12 pt-4 text-center no-print w-full flex flex-col md:flex-row items-center justify-center gap-4">    
-                            <button onClick={handleBatchCreate} disabled={isProcessing} className="inline-flex items-center gap-3 px-8 py-4 rounded-full font-bold text-white text-lg transition-all hover:scale-105 active:scale-95 shadow-xl hover:shadow-2xl disabled:opacity-70 disabled:cursor-not-allowed w-full md:w-auto min-w-[300px] justify-center" style={{ backgroundColor: selectedTemplate.mainColor }}>    
-                                {isProcessing ? (    
-                                    <div className="flex items-center gap-2">    
-                                        <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>    
-                                        <span>{progressText}</span>    
-                                    </div>    
-                                ) : (    
-                                    <>    
-                                        <IconMagic size={24} />    
-                                        <span>デジタル年賀状を作成する</span>    
-                                    </>    
-                                )}    
-                            </button>    
-                            <p className="text-xs text-stone-400 mt-2 md:mt-0 md:absolute md:right-8">※作成ボタンを押すと、画像が写真フォルダに保存されます</p>    
-                                
+                            {!isGenerationComplete ? (    
+                                <button onClick={handleBatchCreate} disabled={isProcessing} className="inline-flex items-center gap-3 px-8 py-4 rounded-full font-bold text-white text-lg transition-all hover:scale-105 active:scale-95 shadow-xl hover:shadow-2xl disabled:opacity-70 disabled:cursor-not-allowed w-full md:w-auto min-w-[300px] justify-center" style={{ backgroundColor: selectedTemplate.mainColor }}>    
+                                    {isProcessing ? (    
+                                        <div className="flex items-center gap-2">    
+                                            <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>    
+                                            <span>{progressText}</span>    
+                                        </div>    
+                                    ) : (    
+                                        <>    
+                                            <IconMagic size={24} />    
+                                            <span>デジタル年賀状を作成する</span>    
+                                        </>    
+                                    )}    
+                                </button>    
+                            ) : (    
+                                <button onClick={handleBatchDownload} className="inline-flex items-center gap-3 px-8 py-4 rounded-full font-bold text-white text-lg transition-all hover:scale-105 active:scale-95 shadow-xl hover:shadow-2xl animate-bounce w-full md:w-auto min-w-[300px] justify-center bg-green-500">    
+                                    <IconShare size={24} />    
+                                    <span>一括ダウンロードする</span>    
+                                </button>    
+                            )}    
+                            <p className="text-xs text-stone-400 mt-2 md:mt-0 md:absolute md:right-8">※作成ボタンを押すと、画像生成が開始されます</p>    
                         </div>    
                     </div>    
                 </div>    
