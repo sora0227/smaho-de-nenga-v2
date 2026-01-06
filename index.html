@@ -648,6 +648,8 @@
             // 修正: 生成済み画像を保持するStateを追加    
             const [generatedImages, setGeneratedImages] = useState([]);    
             const [isGenerationComplete, setIsGenerationComplete] = useState(false);    
+            // 修正: 選択された画像のインデックスを保持するState    
+            const [selectedImageIndices, setSelectedImageIndices] = useState(new Set());    
     
             const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);    
             const [imageScale, setImageScale] = useState(1);    
@@ -795,6 +797,7 @@
                 setProgressText("準備中...");    
                 setGeneratedImages([]); // リセット    
                 setIsGenerationComplete(false);    
+                setSelectedImageIndices(new Set());    
     
                 // 隠しコンテナを作成（画面外）    
                 const hiddenContainer = document.createElement('div');    
@@ -857,7 +860,8 @@
                         const dataUrl = canvas.toDataURL("image/jpeg", 0.9); // Changed to JPEG    
                         newImages.push({    
                             name: `nengajo_${name}_${Date.now()}.jpg`, // Changed extension    
-                            data: dataUrl    
+                            data: dataUrl,    
+                            recipient: name // 宛名を保存    
                         });    
     
                         // ブラウザの負荷軽減のため少し待機    
@@ -866,7 +870,8 @@
                         
                     setGeneratedImages(newImages);    
                     setIsGenerationComplete(true);    
-                    alert("画像の生成が完了しました！\n「一括ダウンロードする」ボタンを押して保存してください。");    
+                    // デフォルトで全選択状態にする    
+                    setSelectedImageIndices(new Set(newImages.map((_, i) => i)));    
     
                 } catch (error) {    
                     console.error("Generation failed:", error);    
@@ -881,13 +886,28 @@
                 }    
             };    
     
-            // 一括ダウンロード処理    
-            const handleBatchDownload = async () => {    
-                if (generatedImages.length === 0) return;    
+            // 選択処理の切り替え    
+            const toggleImageSelection = (index) => {    
+                const newSet = new Set(selectedImageIndices);    
+                if (newSet.has(index)) {    
+                    newSet.delete(index);    
+                } else {    
+                    newSet.add(index);    
+                }    
+                setSelectedImageIndices(newSet);    
+            };    
     
-                alert("画像を一括ダウンロードします。\n※ブラウザの設定により、複数ファイルのダウンロード許可を求められる場合があります。\n※iPhone等の場合、画像が表示されたら長押しで保存してください。");    
+            // 選択した画像の一括ダウンロード処理    
+            const handleDownloadSelected = async () => {    
+                const selectedCount = selectedImageIndices.size;    
+                if (selectedCount === 0) return;    
     
-                for (let i = 0; i < generatedImages.length; i++) {    
+                alert(`${selectedCount}枚の画像を保存します。\n※ブラウザの設定により、複数ファイルのダウンロード許可を求められる場合があります。\n※iPhone等の場合、画像が表示されたら長押しで保存してください。`);    
+    
+                // 選択されたインデックスを昇順にソートして処理    
+                const indices = Array.from(selectedImageIndices).sort((a, b) => a - b);    
+    
+                for (const i of indices) {    
                     const img = generatedImages[i];    
                     const link = document.createElement('a');    
                     link.download = img.name;    
@@ -897,7 +917,6 @@
                     document.body.removeChild(link);    
     
                     // スマホでの連続ダウンロード詰まり防止のためのウェイト    
-                    // 端末の処理速度を考慮して1.5秒待機    
                     await new Promise(r => setTimeout(r, 1500));    
                 }    
             };    
@@ -1139,28 +1158,69 @@
                         
     
                         {/* Footer (Always Visible now) */}    
-                        <div className="max-w-6xl mx-auto px-4 pb-12 pt-4 text-center no-print w-full flex flex-col md:flex-row items-center justify-center gap-4">    
+                        <div className="max-w-6xl mx-auto px-4 pb-12 pt-4 text-center no-print w-full flex flex-col items-center justify-center gap-6">    
                             {!isGenerationComplete ? (    
-                                <button onClick={handleBatchCreate} disabled={isProcessing} className="inline-flex items-center gap-3 px-8 py-4 rounded-full font-bold text-white text-lg transition-all hover:scale-105 active:scale-95 shadow-xl hover:shadow-2xl disabled:opacity-70 disabled:cursor-not-allowed w-full md:w-auto min-w-[300px] justify-center" style={{ backgroundColor: selectedTemplate.mainColor }}>    
-                                    {isProcessing ? (    
-                                        <div className="flex items-center gap-2">    
-                                            <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>    
-                                            <span>{progressText}</span>    
-                                        </div>    
-                                    ) : (    
-                                        <>    
-                                            <IconMagic size={24} />    
-                                            <span>デジタル年賀状を作成する</span>    
-                                        </>    
-                                    )}    
-                                </button>    
+                                <>    
+                                    <button onClick={handleBatchCreate} disabled={isProcessing} className="inline-flex items-center gap-3 px-8 py-4 rounded-full font-bold text-white text-lg transition-all hover:scale-105 active:scale-95 shadow-xl hover:shadow-2xl disabled:opacity-70 disabled:cursor-not-allowed w-full md:w-auto min-w-[300px] justify-center" style={{ backgroundColor: selectedTemplate.mainColor }}>    
+                                        {isProcessing ? (    
+                                            <div className="flex items-center gap-2">    
+                                                <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>    
+                                                <span>{progressText}</span>    
+                                            </div>    
+                                        ) : (    
+                                            <>    
+                                                <IconMagic size={24} />    
+                                                <span>デジタル年賀状を作成する</span>    
+                                            </>    
+                                        )}    
+                                    </button>    
+                                    <p className="text-xs text-stone-400 mt-0">※作成ボタンを押すと、画像生成が開始されます</p>    
+                                </>    
                             ) : (    
-                                <button onClick={handleBatchDownload} className="inline-flex items-center gap-3 px-8 py-4 rounded-full font-bold text-white text-lg transition-all hover:scale-105 active:scale-95 shadow-xl hover:shadow-2xl animate-bounce w-full md:w-auto min-w-[300px] justify-center bg-green-500">    
-                                    <IconShare size={24} />    
-                                    <span>一括ダウンロードする</span>    
-                                </button>    
+                                <div className="w-full bg-white rounded-3xl p-6 shadow-xl border border-stone-100 animate-fade-in-up">    
+                                    <h3 className="text-xl font-bold text-stone-700 mb-4 flex items-center justify-center gap-2 font-mincho">    
+                                        <IconCheckCircle className="text-green-500" /> 作成完了！ ({generatedImages.length}枚)    
+                                    </h3>    
+                                    <p className="text-sm text-stone-500 mb-6">    
+                                        保存したい画像を選択して「保存する」ボタンを押してください。<br/>    
+                                        画像をクリックすると選択を切り替えられます。    
+                                    </p>    
+    
+                                    {/* Image Grid */}    
+                                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8 max-h-[60vh] overflow-y-auto p-2">    
+                                        {generatedImages.map((img, idx) => {    
+                                            const isSelected = selectedImageIndices.has(idx);    
+                                            return (    
+                                                <div     
+                                                    key={idx}     
+                                                    onClick={() => toggleImageSelection(idx)}    
+                                                    className={`relative cursor-pointer group rounded-lg overflow-hidden border-4 transition-all ${isSelected ? 'border-green-500 shadow-md transform scale-105 z-10' : 'border-transparent opacity-80 hover:opacity-100'}`}    
+                                                >    
+                                                    <img src={img.data} alt={img.recipient} className="w-full h-auto object-cover" />    
+                                                    <div className="absolute top-2 right-2">    
+                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${isSelected ? 'bg-green-500 border-green-500 text-white' : 'bg-white/80 border-stone-300 text-transparent'}`}>    
+                                                            <IconCheckCircle size={16} fill="currentColor" />    
+                                                        </div>    
+                                                    </div>    
+                                                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] py-1 px-2 text-center truncate">    
+                                                        {img.recipient} 様    
+                                                    </div>    
+                                                </div>    
+                                            );    
+                                        })}    
+                                    </div>    
+    
+                                    <div className="flex flex-col items-center gap-3">    
+                                        <button onClick={handleDownloadSelected} disabled={selectedImageIndices.size === 0} className="inline-flex items-center gap-3 px-12 py-4 rounded-full font-bold text-white text-lg transition-all hover:scale-105 active:scale-95 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed bg-green-500">    
+                                            <IconShare size={24} />    
+                                            <span>{selectedImageIndices.size}枚の画像を保存する</span>    
+                                        </button>    
+                                        <button onClick={() => setIsGenerationComplete(false)} className="text-sm text-stone-400 hover:text-stone-600 underline">    
+                                            編集画面に戻る    
+                                        </button>    
+                                    </div>    
+                                </div>    
                             )}    
-                            <p className="text-xs text-stone-400 mt-2 md:mt-0 md:absolute md:right-8">※作成ボタンを押すと、画像生成が開始されます</p>    
                         </div>    
                     </div>    
                 </div>    
