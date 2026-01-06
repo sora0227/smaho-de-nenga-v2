@@ -834,7 +834,8 @@
                                 />    
                             );    
                             // レンダリングとQRコード読み込みの待機時間を確保    
-                            setTimeout(resolve, 1000);     
+                            // スマホでの安定性向上のため、待機時間を長めに設定    
+                            setTimeout(resolve, 2000);     
                         });    
     
                         // キャプチャ    
@@ -854,11 +855,11 @@
                         link.click();    
                         document.body.removeChild(link);    
     
-                        // ブラウザの負荷軽減のため少し待機    
-                        await new Promise(r => setTimeout(r, 500));    
+                        // ブラウザの負荷軽減とダウンロードブロック回避のため待機    
+                        await new Promise(r => setTimeout(r, 1500));    
                     }    
                         
-                    alert("画像フォルダへの保存が完了しました！");    
+                    alert("画像フォルダへの保存が完了しました！\n（保存されていない場合は、ブラウザのダウンロード許可設定を確認してください）");    
     
                 } catch (error) {    
                     console.error("Generation failed:", error);    
