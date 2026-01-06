@@ -905,7 +905,6 @@
                 const indices = Array.from(selectedImageIndices).sort((a, b) => a - b);      
       
                 // --- iPhone/Android向け: Web Share APIによる写真保存 ---      
-                // navigator.share がファイル共有に対応している場合に使用      
                 if (navigator.share) {      
                     try {      
                         // DataURLをFileオブジェクトに変換する処理      
@@ -922,16 +921,15 @@
                             return new File([u8arr], img.name, { type: mime });      
                         });      
       
-                        // ブラウザがファイル共有をサポートしているかチェック      
-                        if (navigator.canShare && navigator.canShare({ files })) {      
-                            // iPhoneでは共有シートが開き「画像を保存」を選択することで写真アプリに入ります      
-                            await navigator.share({      
-                                files: files,      
-                                title: 'スマホde年賀！',      
-                                text: '作成した年賀状です！'      
-                            });      
-                            return; // 共有成功時はここで終了（従来のダウンロードは行わない）      
-                        }      
+                        // 修正: canShareチェックを外し、直接shareを試みる      
+                        // iOS Chrome等で canShare が false を返すが、実際には share できるケースへの対応      
+                        await navigator.share({      
+                            files: files,      
+                            title: 'スマホde年賀！',      
+                            text: '作成した年賀状です！'      
+                        });      
+                        return; // 共有成功時はここで終了      
+      
                     } catch (e) {      
                         // キャンセルされた場合やエラー時はフォールバック（下記）へ進む      
                         console.log("Web Share API skipped or failed:", e);      
