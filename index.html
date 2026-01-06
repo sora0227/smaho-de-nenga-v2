@@ -849,14 +849,14 @@
                         const canvas = await html2canvas(hiddenContainer.firstChild, {    
                             scale: 3,     
                             useCORS: true,     
-                            backgroundColor: null,    
+                            backgroundColor: '#ffffff', // Changed for JPEG support    
                             width: CARD_WIDTH,     
                             height: CARD_HEIGHT,     
                         });    
     
-                        const dataUrl = canvas.toDataURL("image/png");    
+                        const dataUrl = canvas.toDataURL("image/jpeg", 0.9); // Changed to JPEG    
                         newImages.push({    
-                            name: `nengajo_${name}_${Date.now()}.png`,    
+                            name: `nengajo_${name}_${Date.now()}.jpg`, // Changed extension    
                             data: dataUrl    
                         });    
     
@@ -885,7 +885,7 @@
             const handleBatchDownload = async () => {    
                 if (generatedImages.length === 0) return;    
     
-                alert("ダウンロードを開始します。\nブラウザから「複数のファイルのダウンロード」の許可を求められた場合は「許可」を選択してください。");    
+                alert("画像を一括ダウンロードします。\n※ブラウザの設定により、複数ファイルのダウンロード許可を求められる場合があります。\n※iPhone等の場合、画像が表示されたら長押しで保存してください。");    
     
                 for (let i = 0; i < generatedImages.length; i++) {    
                     const img = generatedImages[i];    
@@ -897,7 +897,8 @@
                     document.body.removeChild(link);    
     
                     // スマホでの連続ダウンロード詰まり防止のためのウェイト    
-                    await new Promise(r => setTimeout(r, 1000));    
+                    // 端末の処理速度を考慮して1.5秒待機    
+                    await new Promise(r => setTimeout(r, 1500));    
                 }    
             };    
     
