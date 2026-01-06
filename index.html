@@ -506,13 +506,13 @@
                                 </h2>      
                                 <p className={`text-lg font-bold tracking-[0.2em] ml-1 mb-0 leading-none ${template.fontHeading}`} style={{ color: template.mainColor }}>Happy New Year</p>      
                                 <p className={`text-lg font-bold tracking-[0.2em] ml-1 mb-0 leading-none ${template.fontHeading}`} style={{ color: template.mainColor }}>2026</p>      
-                                {/* Recipient Name */}      
+                                {/* Recipient Name (自動で「様」を付与) */}      
                                 {recipientName && (      
                                     <div       
                                         className={`mt-1 ${template.fontBody} text-lg tracking-normal ml-1 mb-0 leading-none inline-block self-start pb-1`}       
                                         style={{ color: '#292524'}}      
                                     >      
-                                        {recipientName}      
+                                        {recipientName} 様      
                                     </div>      
                                 )}      
                             </div>      
@@ -954,6 +954,42 @@
                 }      
             };      
       
+            // 【新規】1名用のSNSシェアハンドラ      
+            const handleShareSingle = async () => {      
+                if (generatedImages.length === 0) return;      
+                const img = generatedImages[0];      
+      
+                try {      
+                    const arr = img.data.split(',');      
+                    const mime = arr[0].match(/:(.*?);/)[1];      
+                    const bstr = atob(arr[1]);      
+                    let n = bstr.length;      
+                    const u8arr = new Uint8Array(n);      
+                    while (n--) {      
+                        u8arr[n] = bstr.charCodeAt(n);      
+                    }      
+                    const file = new File([u8arr], img.name, { type: mime });      
+      
+                    // シェアデータ（テキストにURLを含める）      
+                    const shareData = {      
+                        files: [file],      
+                        title: 'スマホde年賀！',      
+                        text: `年賀状を送ります！${manualGiftUrl ? '\n\nギフトはこちら: ' + manualGiftUrl : ''}`      
+                    };      
+      
+                    if (navigator.share) {      
+                         await navigator.share(shareData);      
+                    } else {      
+                        alert("お使いのブラウザはシェア機能に対応していません。画像を長押しして保存し、SNSで送信してください。");      
+                    }      
+                } catch (e) {      
+                    console.error("Share failed:", e);      
+                    if (e.name !== 'AbortError') {      
+                        alert("シェアに失敗しました。画像を長押しして保存してください。");      
+                    }      
+                }      
+            };      
+      
             const handleImageUpload = (e) => {      
                 const file = e.target.files[0];      
                 if (file) {      
@@ -1076,22 +1112,23 @@
                                         <div className="space-y-2">      
                                             <label className="flex items-center gap-2 text-sm font-bold text-stone-500"><IconQrCode size={16} /> デジタルギフトURL（任意）</label>      
                                                   
-                                            {/* CSV Upload Section */}      
-                                            <div className="bg-stone-50 p-3 rounded-xl border border-dashed border-stone-300">      
-                                                <label className="block text-xs font-bold text-stone-500 mb-2">CSVファイルアップロード</label>      
-                                                <p className="text-[10px] text-stone-400 mb-2">※複数人にまとめて送る場合はこちら<br/>※1列目：パターン名、2列目：URL</p>      
-                                                <input type="file" accept=".csv" onChange={handleCsvUpload} className="text-xs text-stone-500 w-full file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-stone-200 file:text-stone-700 hover:file:bg-stone-300" />      
-                                            </div>      
-      
-                                            {/* Manual fallback (Optional) */}      
-                                            <div className="mt-2">      
-                                                <p className="text-xs font-bold text-stone-500 mb-1">または直接入力</p>      
-                                                <input type="url" value={manualGiftUrl} onChange={(e) => setManualGiftUrl(e.target.value)} placeholder="https://..." className="w-full p-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2" style={{ '--tw-ring-color': selectedTemplate.mainColor }} />      
-                                            </div>      
+                                            {/* 入力欄の切り替え: 宛名が2人以上ならCSV、それ以外なら直接入力 */}      
+                                            {recipientsList.length > 1 ? (      
+                                                <div className="bg-stone-50 p-3 rounded-xl border border-dashed border-stone-300 animate-fade-in-up">      
+                                                    <label className="block text-xs font-bold text-stone-500 mb-2">CSVファイルアップロード</label>      
+                                                    <p className="text-[10px] text-stone-400 mb-2">※複数人にまとめて送る場合はこちら<br/>※1列目：パターン名、2列目：URL</p>      
+                                                    <input type="file" accept=".csv" onChange={handleCsvUpload} className="text-xs text-stone-500 w-full file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-stone-200 file:text-stone-700 hover:file:bg-stone-300" />      
+                                                </div>      
+                                            ) : (      
+                                                <div className="mt-2 animate-fade-in-up">      
+                                                    <p className="text-xs font-bold text-stone-500 mb-1">ギフトURLを入力</p>      
+                                                    <input type="url" value={manualGiftUrl} onChange={(e) => setManualGiftUrl(e.target.value)} placeholder="https://..." className="w-full p-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2" style={{ '--tw-ring-color': selectedTemplate.mainColor }} />      
+                                                </div>      
+                                            )}      
                                         </div>      
       
-                                        {/* 差し込み設定 (Merge Settings) */}      
-                                        {recipientsList.length > 0 && giftPatterns.length > 0 && (      
+                                        {/* 差し込み設定 (Merge Settings) - 2人以上の場合のみ表示 */}      
+                                        {recipientsList.length > 1 && giftPatterns.length > 0 && (      
                                             <div className="space-y-2 animate-fade-in-up">      
                                                 <label className="flex items-center gap-2 text-sm font-bold text-stone-500"><IconMagic size={16} /> 差し込み設定</label>      
                                                 <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 max-h-60 overflow-y-auto">      
@@ -1244,10 +1281,19 @@
                                     </div>      
       
                                     <div className="flex flex-col items-center gap-3">      
-                                        <button onClick={handleDownloadSelected} disabled={selectedImageIndices.size === 0} className="inline-flex items-center gap-3 px-12 py-4 rounded-full font-bold text-white text-lg transition-all hover:scale-105 active:scale-95 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed bg-green-500">      
-                                            <IconShare size={24} />      
-                                            <span>{selectedImageIndices.size}枚の画像を保存する</span>      
-                                        </button>      
+                                        {/* ボタンの出し分け: 1名なら「送る」、複数名なら「保存する」 */}      
+                                        {generatedImages.length === 1 ? (      
+                                            <button onClick={handleShareSingle} className="inline-flex items-center gap-3 px-12 py-4 rounded-full font-bold text-white text-lg transition-all hover:scale-105 active:scale-95 shadow-xl hover:shadow-2xl bg-green-500">      
+                                                <IconShare size={24} />      
+                                                <span>LINE・SNSで送る</span>      
+                                            </button>      
+                                        ) : (      
+                                            <button onClick={handleDownloadSelected} disabled={selectedImageIndices.size === 0} className="inline-flex items-center gap-3 px-12 py-4 rounded-full font-bold text-white text-lg transition-all hover:scale-105 active:scale-95 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed bg-green-500">      
+                                                <IconShare size={24} />      
+                                                <span>{selectedImageIndices.size}枚の画像を保存する</span>      
+                                            </button>      
+                                        )}      
+      
                                         <button onClick={() => setIsGenerationComplete(false)} className="text-sm text-stone-400 hover:text-stone-600 underline">      
                                             編集画面に戻る      
                                         </button>      
